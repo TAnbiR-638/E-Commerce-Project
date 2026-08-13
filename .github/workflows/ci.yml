@@ -1,0 +1,170 @@
+name: NovaShop CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Backend ──────────────────────────────────────────────────────
+  backend:
+    name: Backend — Build & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: novashop
+          POSTGRES_PASSWORD: novashop_pw
+          POSTGRES_DB: novashop_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+
+    env:
+      DATABASE_URL: postgresql://novashop:novashop_pw@localhost:5432/novashop_test
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci_jwt_secret_not_for_production
+      JWT_EXPIRES_IN: 7d
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Push schema to test DB
+        run: npx prisma db push --force-reset
+
+      - name: Run Database Seed
+        run: npm run prisma:seed
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Test Backend Server Startup
+        run: |
+          npm run start &
+          sleep 5
+          curl -f http://localhost:5000/health || exit 1
+
+  # ── Frontend User ─────────────────────────────────────────────
+  frontend-user:
+    name: Frontend User — Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend-user
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend-user/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:5000/api/v1
+          NEXT_PUBLIC_ADMIN_URL: http://localhost:3001
+
+      - name: Test Frontend User Server Startup
+        run: |
+          npm run start &
+          sleep 5
+          curl -f http://localhost:3000 || exit 1
+
+  # ── Frontend Admin ────────────────────────────────────────────
+  frontend-admin:
+    name: Frontend Admin — Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend-admin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend-admin/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:5000/api/v1
+          NEXT_PUBLIC_USER_URL: http://localhost:3000
+
+      - name: Test Frontend Admin Server Startup
+        run: |
+          npm run start &
+          sleep 5
+          curl -f http://localhost:3001 || exit 1
+
+  # ── Deploy (main branch only) ────────────────────────────────
+  deploy:
+    name: Deploy to Production
+    needs: [backend, frontend-user, frontend-admin]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy Backend → Railway
+        run: echo "🚀 Deploy backend → Railway (add RAILWAY_TOKEN secret to enable)"
+        # Uncomment when ready:
+        # run: npx @railway/cli up --service backend
+        # env:
+        #   RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Deploy Frontend User → Vercel
+        run: echo "🚀 Deploy frontend-user → Vercel (add VERCEL_TOKEN secret to enable)"
+        # Uncomment when ready:
+        # run: npx vercel --prod --cwd frontend-user
+        # env:
+        #   VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        #   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        #   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_USER_PROJECT_ID }}
+
+      - name: Deploy Frontend Admin → Vercel
+        run: echo "🚀 Deploy frontend-admin → Vercel (add VERCEL_TOKEN secret to enable)"
+        # run: npx vercel --prod --cwd frontend-admin
+        # env:
+        #   VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        #   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        #   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}

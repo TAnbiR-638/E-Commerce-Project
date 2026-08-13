@@ -1,0 +1,28 @@
+{
+  "name": "e-commerce-project",
+  "version": "1.0.0",
+  "description": "NovaShop Frontend",
+  "main": "index.js",
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend-user": "cd frontend-user && npm run dev",
+    "dev:frontend-admin": "cd frontend-admin && npm run dev",
+    "services:up": "docker compose up -d",
+    "services:down": "docker compose down",
+    "dev": "npm run services:up && concurrently \"npm run dev:backend\" \"npm run dev:frontend-user\" \"npm run dev:frontend-admin\"",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend-user && npm install && cd ../frontend-admin && npm install",
+    "build:all": "cd backend && npm run build && cd ../frontend-user && npm run build && cd ../frontend-admin && npm run build"
+  },
+  "dependencies": {
+    "next": "^16.2.10",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "@types/react": "^18.2.61",
+    "@types/react-dom": "^18.2.19",
+    "concurrently": "^10.0.3",
+    "typescript": "^5.3.3"
+  }
+}
