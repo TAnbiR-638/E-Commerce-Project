@@ -7,7 +7,7 @@ async function main() {
   console.log('🌱 Seeding database with all categories and products...\n');
 
   // ── Users ──────────────────────────────────────────────────────
-  const adminPwd = await bcrypt.hash('Admin@1234', 12);
+  const adminPwd = await bcrypt.hash('admin123', 12);
   const userPwd  = await bcrypt.hash('User@1234', 12);
 
   const admin = await prisma.user.upsert({
@@ -211,7 +211,7 @@ async function main() {
   console.log(`✅ ${seeded} products seeded\n`);
   console.log('─────────────────────────────────────────────');
   console.log('🎉 Seed complete!\n');
-  console.log('  Admin:    admin@novashop.com / Admin@1234');
+  console.log('  Admin:    admin@novashop.com / admin123');
   console.log('  Customer: demo@novashop.com  / User@1234');
   console.log('─────────────────────────────────────────────');
 }

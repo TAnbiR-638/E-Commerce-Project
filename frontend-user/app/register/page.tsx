@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
+import { authApi } from '@/lib/api';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -19,7 +20,7 @@ export default function RegisterPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -27,31 +28,28 @@ export default function RegisterPage() {
       setError('Passwords do not match.');
       return;
     }
-    if (formData.email.toLowerCase().startsWith('admin')) {
-      setError('This email prefix is reserved. Please choose another email.');
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters.');
       return;
     }
 
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      const user = {
-        id: 'u_new',
-        name: formData.name,
-        email: formData.email,
-        role: 'USER' as const,
-        createdAt: new Date().toISOString(),
-      };
-      dispatch({ type: 'SET_USER', payload: user as any });
+    try {
+      const res = await authApi.register(formData.name, formData.email, formData.password);
+      const user = res.user;
+      dispatch({ type: 'SET_USER', payload: user });
       localStorage.setItem('user', JSON.stringify(user));
-
-      // Write cookies for middleware
-      document.cookie = `auth_token=mock_user_token; path=/; max-age=${60 * 60 * 24 * 7}`;
-      document.cookie = `user_role=USER; path=/; max-age=${60 * 60 * 24 * 7}`;
-
+      // Set auth cookies
+      const maxAge = 60 * 60 * 24 * 7;
+      document.cookie = `auth_token=${res.token}; path=/; max-age=${maxAge}`;
+      document.cookie = `user_role=${user.role}; path=/; max-age=${maxAge}`;
       showToast('Account created! Welcome to NovaShop 🎉', 'success');
       router.push('/');
-    }, 1500);
+    } catch (err: any) {
+      setError(err.message || 'Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

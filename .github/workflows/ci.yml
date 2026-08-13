@@ -31,12 +31,18 @@ jobs:
       redis:
         image: redis:7-alpine
         ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     env:
       DATABASE_URL: postgresql://novashop:novashop_pw@localhost:5432/novashop_test
       REDIS_URL: redis://localhost:6379
       JWT_SECRET: ci_jwt_secret_not_for_production
       JWT_EXPIRES_IN: 7d
+      NODE_ENV: test
 
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +64,7 @@ jobs:
         run: npx prisma db push --force-reset
 
       - name: Run Database Seed
-        run: npm run prisma:seed
+        run: npx prisma db seed
 
       - name: Build TypeScript
         run: npm run build
@@ -66,8 +72,20 @@ jobs:
       - name: Test Backend Server Startup
         run: |
           npm run start &
-          sleep 5
-          curl -f http://localhost:5000/health || exit 1
+          SERVER_PID=$!
+          echo "Waiting for server to be ready..."
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:5000/health; then
+              echo "✅ Server is up!"
+              kill $SERVER_PID
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 2s..."
+            sleep 2
+          done
+          echo "❌ Server did not start in time"
+          kill $SERVER_PID 2>/dev/null
+          exit 1
 
   # ── Frontend User ─────────────────────────────────────────────
   frontend-user:
@@ -99,8 +117,23 @@ jobs:
       - name: Test Frontend User Server Startup
         run: |
           npm run start &
-          sleep 5
-          curl -f http://localhost:3000 || exit 1
+          SERVER_PID=$!
+          echo "Waiting for frontend-user to be ready..."
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:3000; then
+              echo "✅ Frontend User is up!"
+              kill $SERVER_PID
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 2s..."
+            sleep 2
+          done
+          echo "❌ Frontend User did not start in time"
+          kill $SERVER_PID 2>/dev/null
+          exit 1
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:5000/api/v1
+          NEXT_PUBLIC_ADMIN_URL: http://localhost:3001
 
   # ── Frontend Admin ────────────────────────────────────────────
   frontend-admin:
@@ -132,8 +165,23 @@ jobs:
       - name: Test Frontend Admin Server Startup
         run: |
           npm run start &
-          sleep 5
-          curl -f http://localhost:3001 || exit 1
+          SERVER_PID=$!
+          echo "Waiting for frontend-admin to be ready..."
+          for i in $(seq 1 15); do
+            if curl -sf http://localhost:3001; then
+              echo "✅ Frontend Admin is up!"
+              kill $SERVER_PID
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying in 2s..."
+            sleep 2
+          done
+          echo "❌ Frontend Admin did not start in time"
+          kill $SERVER_PID 2>/dev/null
+          exit 1
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:5000/api/v1
+          NEXT_PUBLIC_USER_URL: http://localhost:3000
 
   # ── Deploy (main branch only) ────────────────────────────────
   deploy:

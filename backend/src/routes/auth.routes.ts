@@ -11,12 +11,14 @@ const signToken = (id: string, role: string) =>
     expiresIn: (process.env.JWT_EXPIRES_IN || '7d') as any,
   });
 
-// POST /api/v1/auth/register
+// POST /api/v1/auth/register  — creates a USER account
 router.post('/register', async (req: Request, res: Response) => {
   try {
     const { name, email, password } = req.body;
     if (!name || !email || !password)
       return res.status(400).json({ success: false, message: 'All fields are required' });
+    if (password.length < 8)
+      return res.status(400).json({ success: false, message: 'Password must be at least 8 characters' });
 
     const exists = await prisma.user.findUnique({ where: { email } });
     if (exists)
@@ -24,7 +26,37 @@ router.post('/register', async (req: Request, res: Response) => {
 
     const hashed = await bcrypt.hash(password, 12);
     const user = await prisma.user.create({
-      data: { name, email, password: hashed },
+      data: { name, email, password: hashed, role: 'USER' },
+      select: { id: true, name: true, email: true, role: true, createdAt: true },
+    });
+
+    const token = signToken(user.id, user.role);
+    res.status(201).json({ success: true, token, user });
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/v1/auth/admin-register  — creates an ADMIN account (requires invite code)
+router.post('/admin-register', async (req: Request, res: Response) => {
+  try {
+    const { name, email, password, inviteCode } = req.body;
+    if (!name || !email || !password || !inviteCode)
+      return res.status(400).json({ success: false, message: 'All fields including invite code are required' });
+    if (password.length < 6)
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+
+    const validCode = process.env.ADMIN_INVITE_CODE || 'novashop-admin-2024';
+    if (inviteCode !== validCode)
+      return res.status(403).json({ success: false, message: 'Invalid invite code' });
+
+    const exists = await prisma.user.findUnique({ where: { email } });
+    if (exists)
+      return res.status(409).json({ success: false, message: 'Email already registered' });
+
+    const hashed = await bcrypt.hash(password, 12);
+    const user = await prisma.user.create({
+      data: { name, email, password: hashed, role: 'ADMIN' },
       select: { id: true, name: true, email: true, role: true, createdAt: true },
     });
 

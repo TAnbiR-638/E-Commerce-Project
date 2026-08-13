@@ -2,7 +2,9 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { useTheme } from 'next-themes';
 import { useApp } from '@/context/AppContext';
+import { useState, useEffect } from 'react';
 import styles from './AdminShell.module.css';
 
 const NAV_LINKS = [
@@ -16,6 +18,10 @@ const NAV_LINKS = [
 export default function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useApp();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
 
   // On login page — render without sidebar
   if (pathname === '/login') {
@@ -56,6 +62,28 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
               <span className={styles.adminRole}>Administrator</span>
             </div>
           </div>
+
+          {/* Theme Buttons */}
+          {mounted && (
+            <div className={styles.themeRow}>
+              <button
+                onClick={() => setTheme('light')}
+                className={`${styles.themeBtn} ${theme === 'light' ? styles.themeBtnActive : ''}`}
+                title="Light mode"
+              >☀️</button>
+              <button
+                onClick={() => setTheme('dark')}
+                className={`${styles.themeBtn} ${theme === 'dark' ? styles.themeBtnActive : ''}`}
+                title="Dark mode"
+              >🌙</button>
+              <button
+                onClick={() => setTheme('system')}
+                className={`${styles.themeBtn} ${theme === 'system' ? styles.themeBtnActive : ''}`}
+                title="System mode"
+              >💻</button>
+            </div>
+          )}
+
           <div className={styles.sidebarActions}>
             <a
               href="http://localhost:3000"

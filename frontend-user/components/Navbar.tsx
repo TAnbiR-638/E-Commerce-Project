@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { useTheme } from 'next-themes';
 import { useApp } from '@/context/AppContext';
 import styles from './Navbar.module.css';
 
@@ -14,12 +15,16 @@ const NAV_LINKS = [
 
 export default function Navbar() {
   const { cartCount, openCart, user, logout, wishlist } = useApp();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -55,6 +60,33 @@ export default function Navbar() {
 
             {/* Right Actions */}
             <div className={styles.actions}>
+              {/* Theme Toggle — Light / Dark / System */}
+              {mounted && (
+                <div className={styles.themeToggle} role="group" aria-label="Theme">
+                  <button
+                    className={`${styles.themeBtn} ${theme === 'light' ? styles.themeBtnActive : ''}`}
+                    onClick={() => setTheme('light')}
+                    aria-label="Light mode"
+                    title="Light mode"
+                    id="nav-theme-light"
+                  >☀️</button>
+                  <button
+                    className={`${styles.themeBtn} ${theme === 'dark' ? styles.themeBtnActive : ''}`}
+                    onClick={() => setTheme('dark')}
+                    aria-label="Dark mode"
+                    title="Dark mode"
+                    id="nav-theme-dark"
+                  >🌙</button>
+                  <button
+                    className={`${styles.themeBtn} ${theme === 'system' ? styles.themeBtnActive : ''}`}
+                    onClick={() => setTheme('system')}
+                    aria-label="System mode"
+                    title="Follow system"
+                    id="nav-theme-system"
+                  >💻</button>
+                </div>
+              )}
+
               {/* Search */}
               <button
                 className={`btn btn-icon btn-ghost ${styles.actionBtn}`}

@@ -73,3 +73,12 @@ export const reviewsApi = {
   create: (payload: any) =>
     apiFetch<{ data: any }>('/reviews', { method: 'POST', body: JSON.stringify(payload) }),
 };
+
+// ─── CHAT ──────────────────────────────────────────────────
+export const chatApi = {
+  send: (messages: { role: 'user' | 'model'; content: string }[]) =>
+    apiFetch<{ success: boolean; reply: string }>('/chat', {
+      method: 'POST',
+      body: JSON.stringify({ messages }),
+    }),
+};

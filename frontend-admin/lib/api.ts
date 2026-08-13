@@ -39,6 +39,11 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
+  adminRegister: (name: string, email: string, password: string, inviteCode: string) =>
+    apiFetch<{ token: string; user: any }>('/auth/admin-register', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password, inviteCode }),
+    }),
   getMe: () => apiFetch<{ user: any }>('/auth/me'),
 };
 
@@ -97,4 +102,13 @@ export const statsApi = {
     recentOrders: any[];
     topProducts: any[];
   }>('/admin/stats'),
+};
+
+// ─── CHAT ──────────────────────────────────────────────────
+export const chatApi = {
+  send: (messages: { role: 'user' | 'model'; content: string }[]) =>
+    apiFetch<{ success: boolean; reply: string }>('/chat', {
+      method: 'POST',
+      body: JSON.stringify({ messages }),
+    }),
 };

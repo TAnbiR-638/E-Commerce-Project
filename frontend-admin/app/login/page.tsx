@@ -16,6 +16,7 @@ function AdminLoginForm() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const setAuthCookies = (token: string) => {
     const maxAge = 60 * 60 * 8; // 8 hours
@@ -28,7 +29,6 @@ function AdminLoginForm() {
     setError('');
     setLoading(true);
     try {
-      // Try real backend first
       const res = await authApi.login(email, password);
       if (res.user.role !== 'ADMIN') {
         setError('Access denied. This account does not have admin privileges.');
@@ -39,14 +39,8 @@ function AdminLoginForm() {
       setAuthCookies(res.token);
       showToast(`Admin access granted. Welcome, ${res.user.name}!`, 'success');
       router.push(redirectTo);
-    } catch {
-      // Fallback mock auth
-      const user = { id: 'admin_1', name: email.split('@')[0], email, role: 'ADMIN' as const, createdAt: new Date().toISOString() };
-      dispatch({ type: 'SET_USER', payload: user as any });
-      localStorage.setItem('user', JSON.stringify(user));
-      setAuthCookies('mock_admin_token');
-      showToast(`Admin access granted. Welcome, ${user.name}!`, 'success');
-      router.push(redirectTo);
+    } catch (err: any) {
+      setError(err.message || 'Invalid email or password.');
     } finally {
       setLoading(false);
     }
@@ -76,9 +70,24 @@ function AdminLoginForm() {
           </div>
           <div className="input-group">
             <label className="input-label">Password</label>
-            <input type="password" required className={`input ${styles.input}`}
-              placeholder="••••••••" value={password}
-              onChange={e => setPassword(e.target.value)} id="admin-password" />
+            <div style={{ position: 'relative' }}>
+              <input type={showPassword ? 'text' : 'password'} required className={`input ${styles.input}`}
+                placeholder="••••••••" value={password}
+                onChange={e => setPassword(e.target.value)} id="admin-password"
+                style={{ paddingRight: '40px' }} />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                  background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
+                  fontSize: '1.2rem', display: 'flex', alignItems: 'center', padding: '4px',
+                }}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? '👁️' : '👁️‍🗨️'}
+              </button>
+            </div>
           </div>
           <button type="submit" className={`btn btn-lg ${styles.submitBtn}`}
             disabled={loading} id="admin-login-btn">
@@ -90,7 +99,9 @@ function AdminLoginForm() {
           <a href={process.env.NEXT_PUBLIC_USER_URL || 'http://localhost:3000'}
             className={styles.userLink}>← Back to Customer Store</a>
           <div className={styles.demoTip}>
-            <strong>Note:</strong> Only accounts with <code>ADMIN</code> role can access this panel
+            <strong>Note:</strong> Only accounts with <code>ADMIN</code> role can access this panel.
+            Don&apos;t have an account?{' '}
+            <Link href="/register" style={{ color: 'var(--primary-light)', fontWeight: 600 }}>Create Admin Account</Link>
           </div>
         </div>
       </div>

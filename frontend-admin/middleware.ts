@@ -13,8 +13,8 @@ export function middleware(request: NextRequest) {
 
   const isAdmin = !!authToken && userRole === 'ADMIN';
 
-  // Allow login page for non-admins
-  if (pathname === '/login') {
+  // Public auth pages — allow access when not logged in
+  if (pathname === '/login' || pathname === '/register') {
     if (isAdmin) return NextResponse.redirect(new URL('/', request.url));
     return NextResponse.next();
   }

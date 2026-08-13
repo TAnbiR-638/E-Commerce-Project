@@ -15,8 +15,8 @@ function LoginForm() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
   const [showPassword, setShowPassword] = useState(false);
+
 
   const setAuthCookies = (token: string, role: string) => {
     const maxAge = 60 * 60 * 24 * 7; // 7 days
@@ -27,30 +27,21 @@ function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (email.toLowerCase().startsWith('admin')) {
-      setError('Admin accounts must log in via the Admin Portal.');
-      return;
-    }
-
     setLoading(true);
     try {
-      // Try real backend first
       const res = await authApi.login(email, password);
       const user = res.user;
+      if (user.role === 'ADMIN') {
+        setError('Admin accounts must log in via the Admin Portal.');
+        return;
+      }
       dispatch({ type: 'SET_USER', payload: user });
       localStorage.setItem('user', JSON.stringify(user));
       setAuthCookies(res.token, user.role);
       showToast(`Welcome back, ${user.name}!`, 'success');
       router.push(redirectTo);
-    } catch {
-      // Fallback: mock auth (works without backend)
-      const user = { id: 'u1', name: email.split('@')[0], email, role: 'USER' as const, createdAt: new Date().toISOString() };
-      dispatch({ type: 'SET_USER', payload: user as any });
-      localStorage.setItem('user', JSON.stringify(user));
-      setAuthCookies('mock_user_token', 'USER');
-      showToast(`Welcome back, ${user.name}!`, 'success');
-      router.push(redirectTo);
+    } catch (err: any) {
+      setError(err.message || 'Invalid email or password.');
     } finally {
       setLoading(false);
     }
@@ -131,10 +122,6 @@ function LoginForm() {
           <a href={process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3001'} style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
             🔐 Admin Portal →
           </a>
-        </div>
-
-        <div style={{ marginTop: '20px', padding: '12px 16px', background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.15)', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          <strong style={{ color: 'var(--accent-light)' }}>Demo:</strong> Any email + any password signs you in. Backend integration auto-activates when your API is running.
         </div>
       </div>
     </div>
