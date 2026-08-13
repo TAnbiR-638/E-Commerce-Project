@@ -1,9 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
+import { getRelevantContext } from '../lib/rag';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // POST /api/v1/chat
 router.post('/', async (req: Request, res: Response) => {
@@ -16,43 +15,20 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'messages array is required' });
     }
 
-    // ── Fetch live store data ──────────────────────────────────────
-    const [products, categories] = await Promise.all([
-      prisma.product.findMany({
-        where: { isVisible: true },
-        select: {
-          name: true,
-          price: true,
-          originalPrice: true,
-          discount: true,
-          stock: true,
-          rating: true,
-          reviewCount: true,
-          brand: true,
-          tags: true,
-          isFeatured: true,
-          isBestSeller: true,
-          isNew: true,
-          category: { select: { name: true } },
-        },
-        orderBy: { isFeatured: 'desc' },
-      }),
-      prisma.category.findMany({ select: { name: true, description: true } }),
-    ]);
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.json({
+        success: true,
+        reply: "Hi! I'm Nova, your NovaShop assistant. The AI service isn't configured yet — but I can tell you we carry Electronics, Fashion, Home & Living, Sports & Fitness, Outdoor, and Beauty products. Browse our store to explore!",
+      });
+    }
 
-    // ── Build system prompt ────────────────────────────────────────
-    const productList = products
-      .map(p => {
-        const disc = p.discount ? ` (${p.discount}% off, was $${p.originalPrice})` : '';
-        const stock = p.stock === 0 ? ' [OUT OF STOCK]' : p.stock <= 10 ? ` [Low stock: ${p.stock} left]` : ` [In stock: ${p.stock}]`;
-        const badges = [p.isFeatured && 'Featured', p.isBestSeller && 'Best Seller', p.isNew && 'New'].filter(Boolean).join(', ');
-        return `• ${p.name} | Brand: ${p.brand} | Category: ${p.category.name} | Price: $${p.price}${disc}${stock} | Rating: ${p.rating}★ (${p.reviewCount} reviews)${badges ? ` | ${badges}` : ''}`;
-      })
-      .join('\n');
+    // Get the user's latest query
+    const latestUserMessage = messages[messages.length - 1].content;
 
-    const categoryList = categories
-      .map(c => `• ${c.name}${c.description ? ': ' + c.description : ''}`)
-      .join('\n');
+    // Fetch relevant context using RAG
+    console.log(`Fetching RAG context for query: "${latestUserMessage}"`);
+    const relevantContext = await getRelevantContext(latestUserMessage);
 
     const systemPrompt = `You are Nova, the friendly and knowledgeable AI shopping assistant for NovaShop — a premium online store.
 
@@ -63,11 +39,8 @@ STORE INFORMATION:
 - Shipping: Free shipping on orders over $50
 - Payment: All major credit cards, PayPal, and Apple Pay accepted
 
-PRODUCT CATEGORIES:
-${categoryList}
-
-CURRENT PRODUCTS (live inventory):
-${productList}
+RELEVANT PRODUCTS & CATEGORIES (from store database):
+${relevantContext}
 
 YOUR ROLE:
 - Help customers find the right products based on their needs and budget
@@ -79,37 +52,31 @@ YOUR ROLE:
 - Never make up products that aren't in the list above
 - Keep responses concise — 2-4 sentences max unless detail is needed`;
 
-    // ── Call Gemini ────────────────────────────────────────────────
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      // Graceful no-key fallback
-      return res.json({
-        success: true,
-        reply: "Hi! I'm Nova, your NovaShop assistant. The AI service isn't configured yet — but I can tell you we carry Electronics, Fashion, Home & Living, Sports & Fitness, Outdoor, and Beauty products. Browse our store to explore!",
-      });
-    }
+    const ai = new GoogleGenAI({ apiKey });
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    // Filter messages to make sure the first message in contents is from 'user'
+    // Gemini API requires the first message to have the role 'user'
+    const firstUserIdx = messages.findIndex(m => m.role === 'user');
+    const cleanMessages = firstUserIdx !== -1 ? messages.slice(firstUserIdx) : messages;
 
-    // Convert message history to Gemini format (last 10 messages)
-    const history = messages.slice(0, -1).slice(-9).map(m => ({
+    // Format messages for @google/genai format
+    const formattedMessages = cleanMessages.slice(-10).map((m: any) => ({
       role: m.role,
       parts: [{ text: m.content }],
     }));
 
-    const chat = model.startChat({
-      history,
-      systemInstruction: systemPrompt,
+    console.log("Calling Gemini model...");
+    const response = await ai.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: formattedMessages,
+      config: {
+        systemInstruction: systemPrompt
+      }
     });
 
-    const lastMessage = messages[messages.length - 1].content;
-    const result = await chat.sendMessage(lastMessage);
-    const reply = result.response.text();
-
-    res.json({ success: true, reply });
+    res.json({ success: true, reply: response.text });
   } catch (err: any) {
-    console.error('Chat error:', err.message);
+    console.error('Chat error:', err.message || err);
     res.status(500).json({ success: false, message: 'Chat service temporarily unavailable' });
   }
 });
