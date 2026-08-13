@@ -26,12 +26,6 @@ function AdminLoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-
-    if (!email.toLowerCase().startsWith('admin')) {
-      setError('Access denied. Only administrator accounts are permitted here.');
-      return;
-    }
-
     setLoading(true);
     try {
       // Try real backend first
@@ -96,7 +90,7 @@ function AdminLoginForm() {
           <a href={process.env.NEXT_PUBLIC_USER_URL || 'http://localhost:3000'}
             className={styles.userLink}>← Back to Customer Store</a>
           <div className={styles.demoTip}>
-            <strong>Demo:</strong> Use any email starting with <code>admin@</code>
+            <strong>Note:</strong> Only accounts with <code>ADMIN</code> role can access this panel
           </div>
         </div>
       </div>

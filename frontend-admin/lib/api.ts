@@ -74,12 +74,16 @@ export const ordersApi = {
 
 // ─── USERS / CUSTOMERS ───────────────────────────────────────────
 export const usersApi = {
-  getAll: () => apiFetch<{ data: any[] }>('/users'),
-  getById: (id: string) => apiFetch<{ data: any }>(`/users/${id}`),
-  updateRole: (id: string, role: string) =>
-    apiFetch<{ data: any }>(`/users/${id}/role`, {
-      method: 'PUT',
+  getAll: () => apiFetch<{ success: boolean; data: any[] }>('/admin/users'),
+  updateRole: (id: string, role: 'USER' | 'ADMIN') =>
+    apiFetch<{ success: boolean; data: any }>(`/admin/users/${id}/role`, {
+      method: 'PATCH',
       body: JSON.stringify({ role }),
+    }),
+  setPassword: (id: string, password: string) =>
+    apiFetch<{ success: boolean; message: string }>(`/admin/users/${id}/password`, {
+      method: 'PATCH',
+      body: JSON.stringify({ password }),
     }),
 };
 
